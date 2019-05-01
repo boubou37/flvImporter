@@ -88,11 +88,15 @@ class BinaryReader:
 
     def get_values(self, function, offset, count):
         self.step_in(offset)
+        result = self.read_values(function, count);
+        self.step_out()
+        return result;
+
+    def read_values(self, function, count):
         result = []
         for i in range(0, count):
             result.append(function())
-        self.step_out()
-        return result;
+        return result
 
     def read_bytes(self, count):
         bytes = bytearray(self.stream.read(count));
@@ -131,11 +135,28 @@ class BinaryReader:
         position = self.positions.pop()
         self.stream.seek(position)
 
+    def read_sbyte(self):
+        byte = self.read_byte()
+        return (byte + 2**7) % 2**8 - 2**7
+
     def read_vector3(self):
-        x = self.read_float()
-        y = self.read_float()
-        z = self.read_float()
-        return [x, y, z]
+        vector = Vector3(self.read_float(), self.read_float(), self.read_float())
+        return vector
+
+
+class Vector3:
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+
+class Vector4:
+    def __init__(self, x, y, z, w):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.w = w
 
 
 class FlvReader(BinaryReader):
@@ -328,19 +349,136 @@ class FlvReader(BinaryReader):
         Path = self.get_utf16(pathOffset)
 
     def read_vertices(self, mesh, bufferLayouts, dataOffset, version):
-        vertexCount = len(mesh.vertexBuffers[0].vertexCount)
+        vertexCount = mesh.vertexBuffers[0].vertexCount
         for vertexBuffer in mesh.vertexBuffers:
             layout = bufferLayouts[vertexBuffer.layoutIndex]
             self.step_in(dataOffset + vertexBuffer.bufferOffset)
             for i in range(0, vertexCount):
-                self.read_vertex(layout, vertexBuffer, version)
+                self.read_vertex(layout, vertexBuffer.vertexSize, version)
             self.step_out()
 
     #def readBuffer(self, vertexBuffer, bufferLayouts, dataOffset, version):
     #    print()
 
-    def read_vertex(self, layout, vertexBuffer, version):
-        pass
+    def read_vertex(self, layout, vertexSize, version):
+        uvFactor = 1024
+        if version >= 0x20009:
+            uvFactor = 2048
+
+        positions = []
+        boneWeights = []
+        boneIndices = []
+        normals = []
+        tangents = []
+        uvs = []
+        colors = []
+        currentSize = 0
+        read_func = None
+        for member in layout.members:
+            if currentSize + member.size() > vertexSize:
+                break
+            else:
+                currentSize = currentSize + member.size()
+
+            if member.semantic == BufferLayoutMember.Position:
+                if member.type == BufferLayoutMember.Float3:
+                    positions.append(self.read_vector3())
+                else:
+                    raise Exception('type unrecognized for position semantic')
+            elif member.semantic == BufferLayoutMember.BoneWeights:
+                if member.type == BufferLayoutMember.Byte4C:
+                    for i in range(0,4):
+                        boneWeights.append(self.read_sbyte() / 127)
+                elif member.type == BufferLayoutMember.Short4toFloat4A:
+                    for i in range(0,4):
+                        boneWeights.append(self.read_int16() / 32767)
+                else:
+                    raise Exception('type unrecognized for bone weight semantic')
+            elif member.semantic == BufferLayoutMember.BoneIndices:
+                if member.type in [BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4E]:
+                    read_func = self.read_byte
+                elif member.type == BufferLayoutMember.ShortBoneIndices:
+                    read_func = self.read_int16
+                else:
+                    raise Exception('type unrecognized for bone indices semantic')
+                for i in range(0,4):
+                    boneIndices.append(read_func())
+            elif member.semantic == BufferLayoutMember.Normal:
+                typeMaxValue = -1
+                coords = []
+                if member.type in [BufferLayoutMember.Byte4A, BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4C]:
+                    read_func = self.read_byte
+                    typeMaxValue = 127
+                elif member.type == BufferLayoutMember.Short4toFloat4B:
+                    read_func = self.read_in16
+                    typeMaxValue = 32767
+                else:
+                    raise Exception('type unrecognized for normal semantic')
+                for i in range(0,4):
+                    coords.append((read_func() - typeMaxValue) / typeMaxValue)
+                normals.append(coords)
+            elif member.semantic == BufferLayoutMember.UVSemantic:
+                is2d = True
+                if member.type == BufferLayoutMember.Float2:
+                    read_func = self.read_float
+                elif member.type == BufferLayoutMember.Float3:
+                    read_func = self.read_float
+                    is2d = False
+                elif member.type in [BufferLayoutMember.Byte4A, BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4C, BufferLayoutMember.Short2toFloat2, BufferLayoutMember.UVType]:
+                    read_func = self.read_int16
+                elif member == BufferLayoutMember.UVPair:
+                    read_func = self.read_int16
+                    uvs.append(Vector3(read_func() / uvFactor, read_func() / uvFactor, read_func() / uvFactor))
+                elif member.type == BufferLayoutMember.Short4toFloat4B:
+                    read_func = self.read_int16
+                    is2d = False
+                else:
+                    raise Exception('type unrecognized for UV semantic')
+
+                if is2d:
+                    uvs.append(Vector3(read_func() / uvFactor, read_func(), 0))
+                else:
+                    uvs.append(Vector3(read_func() / uvFactor, read_func() / uvFactor, read_func() / uvFactor))
+            elif member.semantic == BufferLayoutMember.Tangent:
+                coords = []
+                if member.type in [BufferLayoutMember.Byte4A, BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4C]:
+                    for i in range(0,4):
+                        coords.append((self.read_byte() - 127 / 127))
+                    tangents.append(Vector4(coords[0], coords[1], coords[2], coords[3]))
+                else:
+                    raise Exception('type unrecognized for Tangent semantic')
+            elif member.semantic == BufferLayoutMember.UnknownVector4A:
+                if member.type in [BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4C]:
+                    self.read_bytes(4)
+                else:
+                    raise Exception('type unrecognized for Sekiro Unknown vector semantic')
+            elif member.semantic == BufferLayoutMember.VertexColor:
+                if member.type in [BufferLayoutMember.Byte4A, BufferLayoutMember.Byte4C]:
+                    read_func = self.read_byte
+                elif member.type == BufferLayoutMember.Float4:
+                    read_func = self.read_float
+                else:
+                    raise Exception('type unrecognized for color semantic')
+
+                readResult = self.read_values(read_func, 4)
+                colors.append(Color(readResult[0], readResult[1], readResult[2], readResult[3]))
+
+        if currentSize < vertexSize:
+            self.read_bytes(4)
+
+
+class Color:
+    def __init__(self, a, r, g, b):
+        self.a = self.color_clamp(a)
+        self.r = self.color_clamp(r)
+        self.g = self.color_clamp(g)
+        self.b = self.color_clamp(b)
+
+    def color_clamp(self, value):
+        if value > 1:
+            return value / 255
+        else:
+            return value
 
 
 class Material:
@@ -374,11 +512,46 @@ class BufferLayout:
 
 
 class BufferLayoutMember:
+    Float2 = 0x01
+    Float3 = 0x02
+    Float4 = 0x03
+    Byte4A = 0x10
+    Byte4B = 0x11
+    Short2toFloat2 = 0x12
+    Byte4C = 0x13
+    UVType = 0x15
+    UVPair = 0x16
+    ShortBoneIndices = 0x18
+    Short4toFloat4A = 0x1A
+    Short4toFloat4B = 0x2E
+    Byte4E = 0x2F
+
+    Position = 0x00
+    BoneWeights = 0x01
+    BoneIndices = 0x02
+    Normal = 0x03
+    UVSemantic = 0x05
+    Tangent = 0x06
+    UnknownVector4A = 0x07
+    VertexColor = 0x0A
+
     def __init__(self):
         self.structOffset = 0;
         self.type = 0;
         self.semantic = 0;
         self.index = 0;
+
+    def size(self):
+        if self.type in [self.Byte4A, self.Byte4B, self.Byte4C, self.Byte4E, self.Short2toFloat2, self.UVType]:
+            return 4
+        elif self.type in [self.Float2, self.UVPair, self.ShortBoneIndices, self.Short4toFloat4A, self.Short4toFloat4B]:
+            return 8
+        elif self.type == self.Float3:
+            return 12
+        elif self.type == self.Float4:
+            return 16
+        else:
+            raise Exception('type note defined, got value :  {}'.format(self.type))
 
 
 class Mesh:

@@ -91,4 +91,4 @@ for mesh in meshes:
     mesh.take_vertex_buffers(vertexBuffersDict)
     br.read_vertices(mesh, bufferLayouts, dataOffset, version)
 
-print('end')
+print('oo')
