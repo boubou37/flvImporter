@@ -404,11 +404,11 @@ class Mesh:
         self.vertexBufferOffset = 0
         self.vertexBufferIndices = []
 
-    def takeFaceSets(self, faceSetsDict):
+    def take_face_sets(self, faceSetsDict):
         for i in self.faceSetIndices:
             self.faceSets.append(faceSetsDict[i])
 
-    def takeVertexBuffers(self, vertexBufferDict):
+    def take_vertex_buffers(self, vertexBufferDict):
         for i in self.vertexBufferIndices:
             self.vertexBuffers.append(vertexBufferDict[i])
 

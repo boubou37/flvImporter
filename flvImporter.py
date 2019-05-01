@@ -87,8 +87,8 @@ for i in range(0, textureCount):
     textures.append(br.read_texture())
 
 for mesh in meshes:
-    mesh.takeFaceSets(faceSetsDict)
-    mesh.takeVertexBuffers(vertexBuffersDict)
+    mesh.take_face_sets(faceSetsDict)
+    mesh.take_vertex_buffers(vertexBuffersDict)
     br.read_vertices(mesh, bufferLayouts, dataOffset, version)
 
 print('end')
