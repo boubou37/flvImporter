@@ -324,6 +324,7 @@ class FlvReader(BinaryReader):
 
     def read_buff_layout_member(self):
         buffLayoutMember = BufferLayoutMember();
+        buffLayoutMember.unk00 = self.assert_int32(0,1,2)
         buffLayoutMember.structOffset = self.read_int32();
         buffLayoutMember.type = self.read_uint32()
         buffLayoutMember.semantic = self.read_uint32()
@@ -536,6 +537,7 @@ class BufferLayoutMember:
     VertexColor = 0x0A
 
     def __init__(self):
+        self.unk00 = 0
         self.structOffset = 0;
         self.type = 0;
         self.semantic = 0;
