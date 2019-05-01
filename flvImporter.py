@@ -51,28 +51,44 @@ br.assert_int32(0);
 br.assert_int32(0);
 br.assert_int32(0);
 
+meshes = []
+faceSets = []
+faceSetsDict = {}
+vertexBuffers = []
+vertexBuffersDict = {}
+bufferLayouts = []
+textures = []
 for i in range(0, dummyCount):
-    br.readDummy()
+    br.read_dummy()
 
 for i in range(0, materialCount):
-    br.readMaterial()
+    br.read_material()
 
 for i in range(0, boneCount):
-    br.readBones()
+    br.read_bones()
 
 for i in range(0, meshCount):
-    br.readMeshes(version)
+    meshes.append(br.read_meshes(version))
 
 for i in range(0, faceSetCount):
-    br.readFaceSets(dataOffset)
+    faceset = br.read_face_set(dataOffset)
+    faceSets.append(faceset)
+    faceSetsDict[i] = faceset
 
 for i in range(0, vertexBufferCount):
-    br.readVertexBuffers()
+    vertexBuffer = br.read_vertex_buffer()
+    vertexBuffers.append(vertexBuffer);
+    vertexBuffersDict[i] = vertexBuffer
 
 for i in range(0, bufferLayoutCount):
-    br.readBufferLayouts()
+    bufferLayouts.append(br.read_buffer_layout());
 
 for i in range(0, textureCount):
-    br.readTextures()
+    textures.append(br.read_texture())
+
+for mesh in meshes:
+    mesh.takeFaceSets(faceSetsDict)
+    mesh.takeVertexBuffers(vertexBuffersDict)
+    br.read_vertices(mesh, bufferLayouts, dataOffset, version)
 
 print('end')

@@ -90,7 +90,7 @@ class BinaryReader:
         self.step_in(offset)
         result = []
         for i in range(0, count):
-            result.append(function)
+            result.append(function())
         self.step_out()
         return result;
 
@@ -139,7 +139,7 @@ class BinaryReader:
 
 
 class FlvReader(BinaryReader):
-    def readDummy(self):
+    def read_dummy(self):
         Position = self.read_vector3();
 
         Unk0C = self.read_byte();
@@ -162,21 +162,22 @@ class FlvReader(BinaryReader):
         self.assert_int32(0);
         self.assert_int32(0);
 
-    def readMaterial(self):
-        nameOffset = self.read_int32();
-        mtdOffset = self.read_int32();
-        textureCount = self.read_int32();
-        textureIndex = self.read_int32();
-        Flags = self.read_int32();
-        gxOffset = self.read_int32();
-        Unk18 = self.read_int32();
+    def read_material(self):
+        material = Material();
+        material.nameOffset = self.read_int32();
+        material.mtdOffset = self.read_int32();
+        material.textureCount = self.read_int32();
+        material.textureIndex = self.read_int32();
+        material.flags = self.read_int32();
+        material.gxOffset = self.read_int32();
+        material.unk18 = self.read_int32();
         self.assert_int32(0);
 
-        Name = self.get_utf16(nameOffset);
-        MTD = self.get_utf16(mtdOffset);
+        material.name = self.get_utf16(material.nameOffset);
+        material.mtd = self.get_utf16(material.mtdOffset);
 
-        if gxOffset > 0:
-            self.step_in(gxOffset)
+        if material.gxOffset > 0:
+            self.step_in(material.gxOffset)
             while True:
                 section = self.read_int32()
                 self.read_int32()
@@ -184,10 +185,12 @@ class FlvReader(BinaryReader):
                 if section == 0x7FFFFFFF:
                     break;
 
-            gxbytes = self.get_bytes(gxOffset, self.stream.tell() - gxOffset)
+            gxbytes = self.get_bytes(material.gxOffset, self.stream.tell() - material.gxOffset)
+            material.gxbytes = gxbytes
             self.step_out()
+        return material
 
-    def readBones(self):
+    def read_bones(self):
         Translation = self.read_vector3();
         nameOffset = self.read_int32();
         Rotation = self.read_vector3();
@@ -215,90 +218,98 @@ class FlvReader(BinaryReader):
         self.assert_int32(0);
         Name = self.get_utf16(nameOffset)
 
-    def readMeshes(self, version):
-        Dynamic = self.read_bool();
+    def read_meshes(self, version):
+        mesh = Mesh()
+        mesh.dynamic = self.read_bool();
         self.assert_byte(0);
         self.assert_byte(0);
         self.assert_byte(0);
 
-        MaterialIndex = self.read_int32();
+        mesh.materialIndex = self.read_int32();
         self.assert_int32(0);
         if version <= 0x20010:
             self.assert_int32(0);
-        DefaultBoneIndex = self.read_int32();
+        mesh.defaultBoneIndex = self.read_int32();
 
-        boneCount = self.read_int32();
-        Unk1 = self.assert_int32(0, 1, 10);
+        mesh.boneCount = self.read_int32();
+        mesh.unk1 = self.assert_int32(0, 1, 10);
         if version >= 0x20013:
-            boundingBoxOffset = self.read_int32();
-            self.step_in(boundingBoxOffset);
-            BoundingBoxMin = self.read_vector3();
-            BoundingBoxMax = self.read_vector3();
+            mesh.boundingBoxOffset = self.read_int32();
+            self.step_in(mesh.boundingBoxOffset);
+            mesh.boundingBoxMin = self.read_vector3();
+            mesh.boundingBoxMax = self.read_vector3();
             if version >= 0x2001A:
-                BoundingBoxUnk = self.read_vector3();
+                mesh.boundingBoxUnk = self.read_vector3();
             self.step_out();
-        boneOffset = self.read_int32();
-        BoneIndices = self.get_int32s(boneOffset, boneCount);
+        mesh.boneOffset = self.read_int32();
+        mesh.boneIndices = self.get_int32s(mesh.boneOffset, mesh.boneCount);
 
-        faceSetCount = self.read_int32();
-        faceSetOffset = self.read_int32();
-        faceSetIndices = self.get_int32s(faceSetOffset, faceSetCount);
+        mesh.faceSetCount = self.read_int32();
+        mesh.faceSetOffset = self.read_int32();
+        mesh.faceSetIndices = self.get_int32s(mesh.faceSetOffset, mesh.faceSetCount);
 
-        vertexBufferCount = self.assert_int32(1, 2, 3);
-        vertexBufferOffset = self.read_int32();
-        vertexBufferIndices = self.get_int32s(vertexBufferOffset, vertexBufferCount)
+        mesh.vertexBufferCount = self.assert_int32(1, 2, 3);
+        mesh.vertexBufferOffset = self.read_int32();
+        mesh.vertexBufferIndices = self.get_int32s(mesh.vertexBufferOffset, mesh.vertexBufferCount)
+        return mesh
 
-    def readFaceSets(self, dataOffset):
-        Flags = self.read_uint32();
+    def read_face_set(self, dataOffset):
+        faceSet = FaceSet()
+        faceSet.flags = self.read_uint32();
 
-        TriangleStrip = self.read_bool();
-        CullBackfaces = self.read_bool();
-        Unk06 = self.read_byte();
-        Unk07 = self.read_byte();
+        faceSet.triangleStrip = self.read_bool();
+        faceSet.cullBackfaces = self.read_bool();
+        faceSet.unk06 = self.read_byte();
+        faceSet.unk07 = self.read_byte();
 
-        vertexCount = self.read_int32();
-        vertexOffset = self.read_int32();
-        vertexSize = self.read_int32();
+        faceSet.vertexCount = self.read_int32();
+        faceSet.vertexOffset = self.read_int32();
+        faceSet.vertexSize = self.read_int32();
 
         self.assert_int32(0);
-        IndexSize = self.assert_int32(0, 16, 32);
+        faceSet.indexSize = self.assert_int32(0, 16, 32);
         self.assert_int32(0);
 
-        if IndexSize == 0 or IndexSize == 16:
-            Vertices = self.get_uint16s(dataOffset + vertexOffset, vertexCount)
-        elif IndexSize == 32:
-            Vertices = self.get_uint32s(dataOffset + vertexOffset, vertexCount)
+        if faceSet.indexSize == 0 or faceSet.indexSize == 16:
+            faceSet.vertices = self.get_uint16s(dataOffset + faceSet.vertexOffset, faceSet.vertexCount)
+        elif faceSet.indexSize == 32:
+            faceSet.vertices = self.get_uint32s(dataOffset + faceSet.vertexOffset, faceSet.vertexCount)
 
-    def readVertexBuffers(self):
-        BufferIndex = self.read_int32();
-        LayoutIndex = self.read_int32();
-        VertexSize = self.read_int32();
-        VertexCount = self.read_int32();
-        self.assert_int32(0);
-        self.assert_int32(0);
-        self.assert_int32(VertexSize * VertexCount);
-        BufferOffset = self.read_int32();
+        return faceSet
 
-    def readBufferLayouts(self):
-        memberCount = self.read_int32();
+    def read_vertex_buffer(self):
+        vBuffer = VertexBuffer();
+        vBuffer.bufferIndex = self.read_int32();
+        vBuffer.layoutIndex = self.read_int32();
+        vBuffer.vertexSize = self.read_int32();
+        vBuffer.vertexCount = self.read_int32();
         self.assert_int32(0);
         self.assert_int32(0);
-        memberOffset = self.read_int32();
-        self.step_in(memberOffset);
-        for i in range(0, memberCount):
-            self.readBuffLayoutMember()
+        self.assert_int32(vBuffer.vertexSize * vBuffer.vertexCount);
+        vBuffer.bufferOffset = self.read_int32();
+        return vBuffer
+
+    def read_buffer_layout(self):
+        bufferLayout = BufferLayout();
+        bufferLayout.memberCount = self.read_int32();
+        self.assert_int32(0);
+        self.assert_int32(0);
+        bufferLayout.memberOffset = self.read_int32();
+        self.step_in(bufferLayout.memberOffset);
+        for i in range(0, bufferLayout.memberCount):
+            bufferLayout.members.append(self.read_buff_layout_member())
         self.step_out();
+        return bufferLayout
 
-    def readTextures(self):
-        print()
+    def read_buff_layout_member(self):
+        buffLayoutMember = BufferLayoutMember();
+        buffLayoutMember.structOffset = self.read_int32();
+        buffLayoutMember.type = self.read_uint32()
+        buffLayoutMember.semantic = self.read_uint32()
+        buffLayoutMember.index = self.read_int32()
+        return buffLayoutMember
 
-    def readBuffLayoutMember(self):
-        StructOffset = self.read_int32();
-        Type = self.read_uint32()
-        Semantic = self.read_uint32()
-        Index = self.read_int32()
-
-    def readTextures(self):
+    def read_texture(self):
         pathOffset = self.read_int32();
         typeOffset = self.read_int32();
         ScaleX = self.read_float();
@@ -315,3 +326,102 @@ class FlvReader(BinaryReader):
 
         Type = self.get_utf16(typeOffset);
         Path = self.get_utf16(pathOffset)
+
+    def read_vertices(self, mesh, bufferLayouts, dataOffset, version):
+        vertexCount = len(mesh.vertexBuffers[0].vertexCount)
+        for vertexBuffer in mesh.vertexBuffers:
+            layout = bufferLayouts[vertexBuffer.layoutIndex]
+            self.step_in(dataOffset + vertexBuffer.bufferOffset)
+            for i in range(0, vertexCount):
+                self.read_vertex(layout, vertexBuffer, version)
+            self.step_out()
+
+    #def readBuffer(self, vertexBuffer, bufferLayouts, dataOffset, version):
+    #    print()
+
+    def read_vertex(self, layout, vertexBuffer, version):
+        pass
+
+
+class Material:
+    def __init__(self):
+        self.nameOffset = 0;
+        self.mtdOffset = 0;
+        self.textureCount = 0;
+        self.textureIndex = 0;
+        self.flags = 0;
+        self.gxOffset = 0;
+        self.unk18 = 0;
+        self.name = '';
+        self.mtd = '';
+        self.gxbytes = []
+
+
+class VertexBuffer:
+    def __init__(self):
+        self.bufferIndex = 0;
+        self.layoutIndex = 0;
+        self.vertexSize = 0;
+        self.vertexCount = 0;
+        self.bufferOffset = 0;
+
+
+class BufferLayout:
+    def __init__(self):
+        self.memberCount = 0;
+        self.memberOffset = 0
+        self.members = []
+
+
+class BufferLayoutMember:
+    def __init__(self):
+        self.structOffset = 0;
+        self.type = 0;
+        self.semantic = 0;
+        self.index = 0;
+
+
+class Mesh:
+    def __init__(self):
+        self.dynamic = False
+        self.materialIndex = 0
+        self.defaultBoneIndex = 0
+        self.boneCount = 0
+        self.unk1 = 0
+        self.boundingBoxOffset = 0
+        self.boundingBoxMin = []
+        self.boundingBoxMax = []
+        self.boundingBoxUnk = []
+        self.faceSets = []
+        self.vertexBuffers = []
+        self.vertices = []
+        self.boneOffset = 0
+        self.boneIndices = []
+        self.faceSetCount = 0
+        self.faceSetOffset = 0
+        self.faceSetIndices = []
+        self.vertexBufferCount = 0
+        self.vertexBufferOffset = 0
+        self.vertexBufferIndices = []
+
+    def takeFaceSets(self, faceSetsDict):
+        for i in self.faceSetIndices:
+            self.faceSets.append(faceSetsDict[i])
+
+    def takeVertexBuffers(self, vertexBufferDict):
+        for i in self.vertexBufferIndices:
+            self.vertexBuffers.append(vertexBufferDict[i])
+
+
+class FaceSet:
+    def __init__(self):
+        self.flags = 0;
+        self.triangleStrip = False;
+        self.cullBackfaces = False;
+        self.unk06 = 0;
+        self.unk07 = 0;
+        self.vertexCount = 0;
+        self.vertexOffset = 0;
+        self.vertexSize = 0;
+        self.indexSize = 0
+        self.vertices = 0
