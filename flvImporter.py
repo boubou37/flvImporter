@@ -86,6 +86,8 @@ for i in range(0, bufferLayoutCount):
 for i in range(0, textureCount):
     textures.append(br.read_texture())
 
+if version >= 0x2001A:
+    sekiroUnknown = br.read_sekiro_unk()
 for mesh in meshes:
     mesh.take_face_sets(faceSetsDict)
     mesh.take_vertex_buffers(vertexBuffersDict)

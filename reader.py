@@ -92,6 +92,9 @@ class BinaryReader:
         self.step_out()
         return result;
 
+    def read_int16s(self, count):
+        return self.read_values(self.read_in16, count)
+
     def read_values(self, function, count):
         result = []
         for i in range(0, count):
@@ -477,6 +480,33 @@ class FlvReader(BinaryReader):
 
         if currentSize < vertexSize:
             self.read_bytes(vertexSize-currentSize)
+
+    def read_sekiro_unk(self):
+        count1 = self.read_int16();
+        count2 = self.read_int16();
+        offset1 = self.read_uint32();
+        offset2 = self.read_uint32();
+        self.assert_int32(0);
+        self.assert_int32(0);
+        self.assert_int32(0);
+        self.assert_int32(0);
+        self.assert_int32(0);
+
+        self.step_in(offset1);
+        for i in range(0, count1):
+            self.read_sekiro_unk_member()
+        self.step_out();
+
+        self.step_in(offset2);
+        for i in range(0, count2):
+            self.read_sekiro_unk_member()
+        self.step_out();
+
+    def read_sekiro_unk_member(self):
+        Unk00 = self.read_int16s(4);
+        Index = self.read_int32();
+        self.assert_int32(0)
+        pass
 
 
 class Color:
