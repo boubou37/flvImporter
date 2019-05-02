@@ -468,15 +468,18 @@ class FlvReader(BinaryReader):
                 else:
                     raise Exception('type unrecognized for Sekiro Unknown vector semantic')
             elif member.semantic == BufferLayoutMember.VertexColor:
+                colorFactor = 0
                 if member.type in [BufferLayoutMember.Byte4A, BufferLayoutMember.Byte4C]:
                     read_func = self.read_byte
+                    colorFactor = 255
                 elif member.type == BufferLayoutMember.Float4:
                     read_func = self.read_float
+                    colorFactor = 1
                 else:
                     raise Exception('type unrecognized for color semantic')
 
                 readResult = self.read_values(read_func, 4)
-                colors.append(Color(readResult[0], readResult[1], readResult[2], readResult[3]))
+                colors.append(Color(readResult[0] / colorFactor, readResult[1] / colorFactor, readResult[2] / colorFactor, readResult[3] / colorFactor))
 
         if currentSize < vertexSize:
             self.read_bytes(vertexSize-currentSize)
@@ -511,16 +514,10 @@ class FlvReader(BinaryReader):
 
 class Color:
     def __init__(self, a, r, g, b):
-        self.a = self.color_clamp(a)
-        self.r = self.color_clamp(r)
-        self.g = self.color_clamp(g)
-        self.b = self.color_clamp(b)
-
-    def color_clamp(self, value):
-        if value > 1:
-            return value / 255
-        else:
-            return value
+        self.a =a
+        self.r =r
+        self.g =g
+        self.b =b
 
 
 class Material:
