@@ -93,7 +93,7 @@ class BinaryReader:
         return result;
 
     def read_int16s(self, count):
-        return self.read_values(self.read_in16, count)
+        return self.read_values(self.read_int16, count)
 
     def read_values(self, function, count):
         result = []
@@ -439,7 +439,7 @@ class FlvReader(BinaryReader):
                     read_func = self.read_int16
                 elif member.type == BufferLayoutMember.UVPair:
                     read_func = self.read_int16
-                    uvs.append(Vector3(read_func() / uvFactor, read_func() / uvFactor, read_func() / uvFactor))
+                    uvs.append(Vector3(read_func() / uvFactor, read_func() / uvFactor, 0))
                 elif member.type == BufferLayoutMember.Short4toFloat4B:
                     read_func = self.read_int16
                     is2d = False
