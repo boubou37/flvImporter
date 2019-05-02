@@ -399,7 +399,7 @@ class FlvReader(BinaryReader):
                 if member.type in [BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4E]:
                     read_func = self.read_byte
                 elif member.type == BufferLayoutMember.ShortBoneIndices:
-                    read_func = self.read_int16
+                    read_func = self.read_uint16
                 else:
                     raise Exception('type unrecognized for bone indices semantic')
                 for i in range(0,4):
@@ -413,10 +413,17 @@ class FlvReader(BinaryReader):
                 elif member.type == BufferLayoutMember.Short4toFloat4B:
                     read_func = self.read_in16
                     typeMaxValue = 32767
+                elif member.type == BufferLayoutMember.Float4:
+                    read_func = self.read_float
+                    typeMaxValue = 0
                 else:
                     raise Exception('type unrecognized for normal semantic')
-                for i in range(0,4):
-                    coords.append((read_func() - typeMaxValue) / typeMaxValue)
+                if typeMaxValue != 0:
+                    for i in range(0,4):
+                        coords.append((read_func() - typeMaxValue) / typeMaxValue)
+                else:
+                    for i in range(0,4):
+                        coords.append(read_func())
                 normals.append(coords)
             elif member.semantic == BufferLayoutMember.UVSemantic:
                 is2d = True
@@ -427,7 +434,7 @@ class FlvReader(BinaryReader):
                     is2d = False
                 elif member.type in [BufferLayoutMember.Byte4A, BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4C, BufferLayoutMember.Short2toFloat2, BufferLayoutMember.UVType]:
                     read_func = self.read_int16
-                elif member == BufferLayoutMember.UVPair:
+                elif member.type == BufferLayoutMember.UVPair:
                     read_func = self.read_int16
                     uvs.append(Vector3(read_func() / uvFactor, read_func() / uvFactor, read_func() / uvFactor))
                 elif member.type == BufferLayoutMember.Short4toFloat4B:
@@ -440,6 +447,10 @@ class FlvReader(BinaryReader):
                     uvs.append(Vector3(read_func() / uvFactor, read_func(), 0))
                 else:
                     uvs.append(Vector3(read_func() / uvFactor, read_func() / uvFactor, read_func() / uvFactor))
+
+                if member.type == BufferLayoutMember.Short4toFloat4B:
+                    self.assert_int16(0);
+
             elif member.semantic == BufferLayoutMember.Tangent:
                 coords = []
                 if member.type in [BufferLayoutMember.Byte4A, BufferLayoutMember.Byte4B, BufferLayoutMember.Byte4C]:
@@ -465,7 +476,7 @@ class FlvReader(BinaryReader):
                 colors.append(Color(readResult[0], readResult[1], readResult[2], readResult[3]))
 
         if currentSize < vertexSize:
-            self.read_bytes(4)
+            self.read_bytes(vertexSize-currentSize)
 
 
 class Color:
